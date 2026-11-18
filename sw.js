@@ -1,4 +1,4 @@
-// Keeps a copy of the site on each phone after the first visit,
+// Keeps a copy of the site on each phone after the first visit, 
 // so the lyrics still work if the connection drops.
 // Always tries the network first, so your edits show up right away.
 const CACHE = 'lyrics-v1';
