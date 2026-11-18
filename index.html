@@ -784,8 +784,11 @@
   applyTheme(root.dataset.theme === 'light' ? 'light' : 'dark');
   keepAwake();
 
+  var freshTag = 't=' + Date.now();
   function getText(url) {
-    return fetch(url, { cache: 'no-cache' }).then(function (r) {
+    // The unique ?t= tag gets past GitHub's and the browser's saved copies on every load.
+    var fresh = url + (url.indexOf('?') === -1 ? '?' : '&') + freshTag;
+    return fetch(fresh, { cache: 'no-store' }).then(function (r) {
       if (!r.ok) throw new Error(url + ' ' + r.status);
       return r.text();
     });
