@@ -2,6 +2,8 @@
 # ------------------------------------------------------------
 # This file controls which songs show up and in what order.
 #  - Each line under "songs:" is the name of a file in the songs folder.
+#  - Songs under "additional:" show in the menu under "Additional Songs",
+#    ready in case there's time. Leave it empty or delete it if not needed.
 #  - Reorder the lines to reorder the songs. Delete a line to hide a song.
 #  - The ".txt" at the end is optional.
 #  - Lines starting with # are notes and never show on the site.
@@ -9,17 +11,17 @@
 
 title: Worship Night
 
+# How often open phones check for changes, in seconds (10 to 600).
+# 30 is a good default. Use 60 for very large crowds, or "off" to stop
+# timed checks (phones still check when switching songs or reopening the site).
+refresh: 30
+
+# Optional: shown under every song. Keep the quotes if it contains a #.
+# license: "CCLI License #1234567"
+
 songs:
-  - We Praise You.txt
-  - Trust In God.txt
-  - Another In The Fire.txt
-  - AMAZING!.txt
-  - Gratitude.txt
-  - Abide.txt
-  - Praise.txt
-  - Revelation Song.txt
-  - Holy Forever.txt
+  - amazing-grace
+  - be-thou-my-vision
 
 additional:
-  - Firm Foundation.txt
-  - Christ Be Magnified.txt
+  - it-is-well

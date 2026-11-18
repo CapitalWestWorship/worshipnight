@@ -570,7 +570,7 @@
     return v.trim();
   }
   function parseSetlist(text) {
-    var set = { title: '', license: '', songs: [], additional: [] };
+    var set = { title: '', license: '', songs: [], additional: [], refresh: null };
     var list = null;
     splitLines(text).forEach(function (line) {
       var t = line.trim();
@@ -589,6 +589,11 @@
         else list = null;
         if (key === 'title') set.title = cleanValue(kv[2]);
         if (key === 'license') set.license = cleanValue(kv[2]);
+        if (/^(refresh|refresh-seconds|check-every|poll-seconds)$/.test(key)) {
+          var r = cleanValue(kv[2]);
+          if (/^(off|no|false|0)$/i.test(r)) set.refresh = 0;
+          else if (!isNaN(parseInt(r, 10))) set.refresh = Math.max(10, Math.min(600, parseInt(r, 10)));
+        }
       }
     });
     return set;
@@ -812,8 +817,12 @@
   keepAwake();
 
   // ---------- Loading & live updates ----------
-  var POLL_SECONDS = 30;      // how often an open page checks for changes
-  var FULL_CHECK_EVERY = 10;  // every 10th check (about 5 minutes), recheck every song
+  // How often an open page checks for changes is set by "refresh:" in setlist.yaml.
+  var DEFAULT_REFRESH = 30;        // seconds, if setlist.yaml doesn't say
+  var FULL_CHECK_MS = 5 * 60000;   // recheck every song file about every 5 minutes
+  var refreshSeconds = DEFAULT_REFRESH;
+  var lastFullCheck = 0;
+  var pollTimer = null;
 
   function getText(url) {
     // A unique ?t= tag on every request gets past GitHub's and the browser's saved copies.
@@ -899,6 +908,9 @@
   function load(all, firstLoad) {
     return getText('setlist.yaml').then(function (text) {
       var set = parseSetlist(text);
+      var wanted = set.refresh == null ? DEFAULT_REFRESH : set.refresh;
+      if (wanted !== refreshSeconds) { refreshSeconds = wanted; if (started) schedule(); }
+      if (all) lastFullCheck = Date.now();
       var openPath = songs[current] ? songs[current].file : null;
       var seen = {};
       var paths = entriesOf(set).map(function (e) { return e.path; })
@@ -927,7 +939,16 @@
     });
   }
 
-  var checking = false, checks = 0, started = false;
+  var checking = false, started = false;
+  function schedule() {
+    clearTimeout(pollTimer);
+    if (refreshSeconds > 0) {
+      pollTimer = setTimeout(function () {
+        checkForUpdates(Date.now() - lastFullCheck >= FULL_CHECK_MS);
+        schedule();
+      }, refreshSeconds * 1000);
+    }
+  }
   function checkForUpdates(all) {
     if (!started || checking || document.visibilityState !== 'visible') return;
     checking = true;
@@ -937,10 +958,7 @@
   load(true, true)
     .then(function () {
       started = true;
-      setInterval(function () {
-        checks++;
-        checkForUpdates(checks % FULL_CHECK_EVERY === 0);
-      }, POLL_SECONDS * 1000);
+      schedule();
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') checkForUpdates(true);
       });
