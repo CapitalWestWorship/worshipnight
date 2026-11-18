@@ -216,11 +216,25 @@
     text-overflow: ellipsis;
   }
   .nav-pos {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     padding: 0 4px;
     font-size: 13px;
+    line-height: 1.25;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+  .nav-pos small { font-size: 11px; color: var(--accent); }
+  .list-heading h3 {
+    margin: 14px 0 0;
+    padding: 16px 20px 6px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.02em;
   }
   @media (max-width: 340px) {
     .nav-btn .label { display: none; }
@@ -407,7 +421,7 @@
     </button>
     <span class="nav-pos" id="ui-pos"></span>
     <button class="nav-btn next" id="ui-next" disabled>
-      <span class="label"><small>Next</small><span id="ui-next-name"></span></span>
+      <span class="label"><small id="ui-next-kind">Next</small><span id="ui-next-name"></span></span>
       <span class="arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
     </button>
   </div>
@@ -453,7 +467,7 @@
     scrim: $('ui-scrim'), list: $('ui-song-list'), license: $('ui-license'),
     displayBtn: $('ui-display-btn'), panel: $('ui-panel'),
     sizeDown: $('ui-size-down'), sizeUp: $('ui-size-up'), sizeValue: $('ui-size-value'),
-    prev: $('ui-prev'), next: $('ui-next'), prevName: $('ui-prev-name'), nextName: $('ui-next-name'),
+    prev: $('ui-prev'), next: $('ui-next'), prevName: $('ui-prev-name'), nextName: $('ui-next-name'), nextKind: $('ui-next-kind'),
     pos: $('ui-pos')
   };
 
@@ -534,21 +548,23 @@
     return v.trim();
   }
   function parseSetlist(text) {
-    var set = { title: '', license: '', songs: [] };
-    var inSongs = false;
+    var set = { title: '', license: '', songs: [], additional: [] };
+    var list = null;
     splitLines(text).forEach(function (line) {
       var t = line.trim();
       if (!t || t.charAt(0) === '#') return;
       var item = /^-\s*(.*)$/.exec(t);
       if (item) {
         var v = cleanValue(item[1]);
-        if (inSongs && v) set.songs.push(v);
+        if (list && v) list.push(v);
         return;
       }
       var kv = /^([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(t);
       if (kv && !/^\s/.test(line)) {
-        var key = kv[1].toLowerCase();
-        inSongs = key === 'songs';
+        var key = kv[1].toLowerCase().replace(/_/g, '-');
+        if (key === 'songs') list = set.songs;
+        else if (/^(additional|extra|extras)(-songs)?$/.test(key)) list = set.additional;
+        else list = null;
         if (key === 'title') set.title = cleanValue(kv[2]);
         if (key === 'license') set.license = cleanValue(kv[2]);
       }
@@ -620,7 +636,10 @@
     els.nextName.textContent = next ? next.title : '';
     els.prev.setAttribute('aria-label', prev ? 'Previous song: ' + prev.title : 'No previous song');
     els.next.setAttribute('aria-label', next ? 'Next song: ' + next.title : 'No next song');
-    els.pos.textContent = (i + 1) + ' of ' + songs.length;
+    var group = songs.filter(function (x) { return x.additional === s.additional; });
+    var posText = (group.indexOf(s) + 1) + ' of ' + group.length;
+    els.pos.innerHTML = s.additional ? '<small>Additional</small><span>' + posText + '</span>' : '<span>' + posText + '</span>';
+    els.nextKind.textContent = next && next.additional && !s.additional ? 'Additional' : 'Next';
 
     Array.prototype.forEach.call(els.list.querySelectorAll('a'), function (a, idx) {
       if (idx === i) a.setAttribute('aria-current', 'page');
@@ -629,9 +648,16 @@
   }
 
   function renderList() {
-    els.list.innerHTML = songs.map(function (s, i) {
-      return '<li><a href="#' + esc(s.slug) + '"><span class="num">' + (i + 1) + '</span><span>' + esc(s.title) + '</span></a></li>';
-    }).join('');
+    var html = '', n = 0, headed = false;
+    songs.forEach(function (s) {
+      if (s.additional && !headed) {
+        html += '<li class="list-heading" role="presentation"><h3>Additional Songs</h3></li>';
+        headed = true;
+      }
+      var num = s.additional ? '' : String(++n);
+      html += '<li><a href="#' + esc(s.slug) + '"><span class="num" aria-hidden="' + (num ? 'false' : 'true') + '">' + num + '</span><span>' + esc(s.title) + '</span></a></li>';
+    });
+    els.list.innerHTML = html;
     els.license.textContent = meta.license || '';
     els.setTitle.textContent = meta.title || 'Lyrics';
   }
@@ -770,14 +796,17 @@
       var set = parseSetlist(text);
       meta.title = set.title;
       meta.license = set.license;
-      return Promise.all(set.songs.map(function (entry) {
-        var path = songPath(entry);
+      var entries = set.songs.map(function (e) { return { name: e, additional: false }; })
+        .concat(set.additional.map(function (e) { return { name: e, additional: true }; }));
+      return Promise.all(entries.map(function (entry) {
+        var path = songPath(entry.name);
         return getText(path)
           .then(function (t) { return parseSong(t, path); })
           .catch(function () {
             if (window.console) console.warn('Missing song file: ' + path + ' (check the name in setlist.yaml)');
             return { title: titleFromFile(path), credits: [], stanzas: [], file: path, missing: true };
-          });
+          })
+          .then(function (s) { s.additional = entry.additional; return s; });
       }));
     })
     .then(function (list) {
