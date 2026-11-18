@@ -373,7 +373,28 @@
     font-weight: 500;
   }
 
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 18px);
+    z-index: 22;
+    padding: 9px 16px;
+    background: var(--raised);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    font-size: 14px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, 8px);
+    transition: opacity 200ms, transform 200ms;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
   @media (prefers-reduced-motion: reduce) {
+    .toast { transition: none; }
     main.enter { animation: none; }
     .scrim, .drawer { transition: none; }
   }
@@ -427,6 +448,7 @@
   </div>
 </nav>
 
+<div class="toast" id="ui-toast" role="status" aria-live="polite"></div>
 <div class="scrim" id="ui-scrim"></div>
 <aside class="drawer" id="ui-drawer" aria-label="Songs">
   <div class="drawer-head">
@@ -598,8 +620,9 @@
   }
 
   // ---------- Rendering ----------
-  function renderSong(i) {
+  function renderSong(i, keepScroll) {
     if (!songs.length) return;
+    var savedScroll = window.scrollY;
     i = Math.max(0, Math.min(songs.length - 1, i));
     var s = songs[i];
     current = i;
@@ -622,10 +645,14 @@
     }
 
     els.main.innerHTML = html;
-    els.main.classList.remove('enter');
-    void els.main.offsetWidth;
-    els.main.classList.add('enter');
-    window.scrollTo(0, 0);
+    if (keepScroll) {
+      window.scrollTo(0, savedScroll);
+    } else {
+      els.main.classList.remove('enter');
+      void els.main.offsetWidth;
+      els.main.classList.add('enter');
+      window.scrollTo(0, 0);
+    }
 
     document.title = s.title + (meta.title ? ' – ' + meta.title : '');
 
@@ -680,7 +707,7 @@
   }
   window.addEventListener('hashchange', function () {
     var i = indexFromHash();
-    if (i >= 0) { renderSong(i); closeMenu(); }
+    if (i >= 0) { renderSong(i); closeMenu(); checkForUpdates(false); }
   });
   els.prev.addEventListener('click', function () { go(current - 1); });
   els.next.addEventListener('click', function () { go(current + 1); });
@@ -784,54 +811,139 @@
   applyTheme(root.dataset.theme === 'light' ? 'light' : 'dark');
   keepAwake();
 
-  var freshTag = 't=' + Date.now();
+  // ---------- Loading & live updates ----------
+  var POLL_SECONDS = 30;      // how often an open page checks for changes
+  var FULL_CHECK_EVERY = 10;  // every 10th check (about 5 minutes), recheck every song
+
   function getText(url) {
-    // The unique ?t= tag gets past GitHub's and the browser's saved copies on every load.
-    var fresh = url + (url.indexOf('?') === -1 ? '?' : '&') + freshTag;
+    // A unique ?t= tag on every request gets past GitHub's and the browser's saved copies.
+    var fresh = url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
     return fetch(fresh, { cache: 'no-store' }).then(function (r) {
       if (!r.ok) throw new Error(url + ' ' + r.status);
       return r.text();
     });
   }
 
-  getText('setlist.yaml')
-    .then(function (text) {
+  var setlistText = null;
+  var songTexts = {}; // file path -> text, or null if the file is missing
+
+  function entriesOf(set) {
+    return set.songs.map(function (e) { return { path: songPath(e), additional: false }; })
+      .concat(set.additional.map(function (e) { return { path: songPath(e), additional: true }; }));
+  }
+
+  function fetchSongText(path) {
+    return getText(path).then(
+      function (t) { return t; },
+      function (err) {
+        // A real 404 means the file is missing; a network error keeps what we already have.
+        if (/ 404$/.test(err.message)) {
+          if (window.console) console.warn('Missing song file: ' + path + ' (check the name in setlist.yaml)');
+          return null;
+        }
+        return path in songTexts ? songTexts[path] : null;
+      }
+    );
+  }
+
+  function assemble(set) {
+    var used = {};
+    return entriesOf(set).map(function (e) {
+      var t = songTexts[e.path];
+      var s = t == null
+        ? { title: titleFromFile(e.path), credits: [], stanzas: [], file: e.path, missing: true }
+        : parseSong(t, e.path);
+      s.additional = e.additional;
+      var base = slugify(fileBase(e.path)), slug = base, n = 2;
+      while (used[slug]) slug = base + '-' + (n++);
+      used[slug] = true;
+      s.slug = slug;
+      return s;
+    });
+  }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $('ui-toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 3000);
+  }
+
+  function showSet(set, firstLoad) {
+    var oldSlug = !firstLoad && songs[current] ? songs[current].slug : null;
+    meta.title = set.title;
+    meta.license = set.license;
+    songs = assemble(set);
+    renderList();
+    if (!songs.length) {
+      showStatus('No songs yet. List song files under “songs:” in setlist.yaml.');
+      return;
+    }
+    var i = -1;
+    if (oldSlug) {
+      for (var k = 0; k < songs.length; k++) if (songs[k].slug === oldSlug) { i = k; break; }
+    } else {
+      i = indexFromHash();
+    }
+    var stayed = i >= 0 && !firstLoad;
+    if (i < 0) {
+      i = 0;
+      try { history.replaceState(null, '', '#' + songs[0].slug); } catch (e) {}
+    }
+    renderSong(i, stayed);
+  }
+
+  // all = recheck every song file; otherwise just the set list, new songs, and the open song.
+  function load(all, firstLoad) {
+    return getText('setlist.yaml').then(function (text) {
       var set = parseSetlist(text);
-      meta.title = set.title;
-      meta.license = set.license;
-      var entries = set.songs.map(function (e) { return { name: e, additional: false }; })
-        .concat(set.additional.map(function (e) { return { name: e, additional: true }; }));
-      return Promise.all(entries.map(function (entry) {
-        var path = songPath(entry.name);
-        return getText(path)
-          .then(function (t) { return parseSong(t, path); })
-          .catch(function () {
-            if (window.console) console.warn('Missing song file: ' + path + ' (check the name in setlist.yaml)');
-            return { title: titleFromFile(path), credits: [], stanzas: [], file: path, missing: true };
-          })
-          .then(function (s) { s.additional = entry.additional; return s; });
-      }));
-    })
-    .then(function (list) {
-      songs = list;
-      var used = {};
-      songs.forEach(function (s) {
-        var base = slugify(fileBase(s.file)), slug = base, n = 2;
-        while (used[slug]) slug = base + '-' + (n++);
-        used[slug] = true;
-        s.slug = slug;
+      var openPath = songs[current] ? songs[current].file : null;
+      var seen = {};
+      var paths = entriesOf(set).map(function (e) { return e.path; })
+        .filter(function (p) { if (seen[p]) return false; seen[p] = true; return true; });
+      var toFetch = paths.filter(function (p) { return all || !(p in songTexts) || p === openPath; });
+
+      return Promise.all(toFetch.map(function (p) {
+        return fetchSongText(p).then(function (t) { return { path: p, text: t }; });
+      })).then(function (results) {
+        var setChanged = text !== setlistText;
+        var openChanged = false, anyChanged = false;
+        results.forEach(function (r) {
+          if (songTexts[r.path] !== r.text) {
+            anyChanged = true;
+            if (r.path === openPath) openChanged = true;
+          }
+          songTexts[r.path] = r.text;
+        });
+        setlistText = text;
+        if (firstLoad) { showSet(set, true); return; }
+        if (!setChanged && !anyChanged) return;
+        showSet(set, false);
+        if (setChanged) toast('Set list updated');
+        else if (openChanged) toast('Lyrics updated');
       });
-      renderList();
-      if (!songs.length) {
-        showStatus('No songs yet. List song files under “songs:” in setlist.yaml.');
-        return;
-      }
-      var i = indexFromHash();
-      if (i < 0) {
-        i = 0;
-        try { history.replaceState(null, '', '#' + songs[0].slug); } catch (e) {}
-      }
-      renderSong(i);
+    });
+  }
+
+  var checking = false, checks = 0, started = false;
+  function checkForUpdates(all) {
+    if (!started || checking || document.visibilityState !== 'visible') return;
+    checking = true;
+    load(all, false).catch(function () {}).then(function () { checking = false; });
+  }
+
+  load(true, true)
+    .then(function () {
+      started = true;
+      setInterval(function () {
+        checks++;
+        checkForUpdates(checks % FULL_CHECK_EVERY === 0);
+      }, POLL_SECONDS * 1000);
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') checkForUpdates(true);
+      });
     })
     .catch(function () {
       if (location.protocol === 'file:') {
