@@ -1,0 +1,35 @@
+// HOW A SONG FILE WORKS
+// Lines starting with // are notes for you and never show on the site.
+// First line: # and the song title. (If you leave it out, the file name is used.)
+// Next lines starting with > are credits, shown at the end of the song.
+// Then paste the lyrics straight from Planning Center.
+// Section names like Verse 1, Chorus, Bridge, [Pre-Chorus] or VERSE 2
+// are recognized automatically, and chord lines are removed.
+// Leave a blank line between stanzas.
+
+# Amazing Grace
+> Words: John Newton, 1779. Public domain.
+
+Verse 1
+Amazing grace! How sweet the sound
+That saved a wretch like me!
+I once was lost, but now am found;
+Was blind, but now I see.
+
+Verse 2
+'Twas grace that taught my heart to fear,
+And grace my fears relieved;
+How precious did that grace appear
+The hour I first believed.
+
+Verse 3
+Through many dangers, toils and snares,
+I have already come;
+'Tis grace hath brought me safe thus far,
+And grace will lead me home.
+
+Verse 4
+When we've been there ten thousand years,
+Bright shining as the sun,
+We've no less days to sing God's praise
+Than when we'd first begun.

@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#17161C">
+<title>Lyrics</title>
+<script>
+  // Set the saved theme before anything draws, so there's no flash of the wrong colors.
+  try { if (localStorage.getItem('lyrics-theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #17161C;
+    --surface: #211F28;
+    --raised: #2B2834;
+    --text: #ECE7DF;
+    --muted: #A49EAE;
+    --accent: #D9B36C;
+    --line: #34303D;
+    --scrim: rgba(8, 7, 12, 0.62);
+    --shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+    --lyric-size: 20px;
+    --top-h: 52px;
+    --bar-h: 64px;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #F8F7F4;
+    --surface: #FFFFFF;
+    --raised: #EFEDE8;
+    --text: #1F1C24;
+    --muted: #6A6475;
+    --accent: #8A621E;
+    --line: #E2DED6;
+    --scrim: rgba(20, 18, 26, 0.35);
+    --shadow: 0 14px 36px rgba(31, 28, 36, 0.16);
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    background: var(--bg);
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body.locked { overflow: hidden; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Top bar */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: calc(var(--top-h) + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) max(6px, env(safe-area-inset-right, 0px)) 0 max(6px, env(safe-area-inset-left, 0px));
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .set-title {
+    flex: 1;
+    margin: 0;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .icon-btn {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .icon-btn:active, .icon-btn[aria-expanded="true"] { background: var(--raised); }
+  .icon-btn svg { width: 24px; height: 24px; }
+  .aa { font-size: 17px; font-weight: 500; letter-spacing: -0.02em; }
+  .aa small { font-size: 13px; }
+
+  /* Lyrics */
+  main {
+    max-width: 36rem;
+    margin: 0 auto;
+    padding:
+      28px
+      max(22px, env(safe-area-inset-right, 0px))
+      calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 56px)
+      max(22px, env(safe-area-inset-left, 0px));
+  }
+  main.enter { animation: enter 180ms ease-out; }
+  @keyframes enter { from { opacity: 0; } to { opacity: 1; } }
+
+  .song-title {
+    margin: 0 0 1.25em;
+    font-size: calc(var(--lyric-size) * 1.6);
+    font-weight: 300;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+  .song-title:focus { outline: none; }
+  .stanza {
+    margin: 0 0 1.6em;
+    font-size: var(--lyric-size);
+    line-height: 1.5;
+  }
+  .stanza-label {
+    margin: 0 0 0.3em;
+    font-size: max(13px, calc(var(--lyric-size) * 0.66));
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+  .lines { margin: 0; }
+  /* Long lines wrap with a hanging indent, so a wrapped line reads as one line */
+  .line { display: block; padding-left: 1em; text-indent: -1em; }
+  .is-chorus {
+    border-left: 2px solid var(--accent);
+    padding-left: 14px;
+    margin-left: -16px;
+  }
+  .credits {
+    margin-top: 2.5em;
+    padding-top: 1em;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .credits p { margin: 0 0 0.3em; }
+
+  .status {
+    padding: 48px 4px;
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  /* Bottom bar */
+  .navbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  .navbar-inner {
+    max-width: 36rem;
+    min-height: 52px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 4px;
+  }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0 6px;
+    background: none;
+    border: 0;
+    border-radius: 14px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .nav-btn.next { justify-content: flex-end; text-align: right; }
+  .nav-btn:disabled { opacity: 0.28; cursor: default; }
+  .nav-btn .arrow {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--raised);
+  }
+  .nav-btn:not(:disabled):active .arrow { background: var(--accent); color: var(--bg); }
+  .nav-btn .arrow svg { width: 22px; height: 22px; }
+  .nav-btn .label { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+  .nav-btn .label small { font-size: 12px; color: var(--muted); }
+  .nav-btn .label span {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav-pos {
+    padding: 0 4px;
+    font-size: 13px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  @media (max-width: 340px) {
+    .nav-btn .label { display: none; }
+  }
+
+  /* Song menu */
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: var(--scrim);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 200ms, visibility 200ms;
+  }
+  .drawer {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 31;
+    width: min(84vw, 340px);
+    display: flex;
+    flex-direction: column;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 240ms ease, visibility 240ms;
+  }
+  body.menu-open .scrim { opacity: 1; visibility: visible; }
+  body.menu-open .drawer { transform: none; visibility: visible; }
+  .drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--top-h);
+    padding: 0 6px 0 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .drawer-head h2 { margin: 0; font-size: 17px; font-weight: 500; }
+  .song-list {
+    flex: 1;
+    margin: 0;
+    padding: 8px 0;
+    list-style: none;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .song-list a {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 14px 20px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 17px;
+    line-height: 1.3;
+  }
+  .song-list a:active { background: var(--raised); }
+  .song-list .num {
+    min-width: 1.4em;
+    font-size: 14px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .song-list a[aria-current="page"] {
+    background: var(--raised);
+    box-shadow: inset 3px 0 0 var(--accent);
+    font-weight: 500;
+  }
+  .drawer-foot {
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .drawer-foot:empty { display: none; }
+
+  /* Display settings panel */
+  .panel {
+    position: fixed;
+    top: calc(var(--top-h) + env(safe-area-inset-top, 0px) + 6px);
+    right: max(8px, env(safe-area-inset-right, 0px));
+    z-index: 25;
+    width: min(300px, calc(100vw - 16px));
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  .panel[hidden] { display: none; }
+  .panel-row + .panel-row { margin-top: 18px; }
+  .panel-label { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+  .stepper {
+    display: grid;
+    grid-template-columns: 52px 1fr 52px;
+    align-items: center;
+    background: var(--raised);
+    border-radius: 12px;
+  }
+  .stepper button {
+    height: 48px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .stepper button:disabled { opacity: 0.3; cursor: default; }
+  .stepper .smaller { font-size: 14px; }
+  .stepper .larger { font-size: 22px; }
+  .stepper output { text-align: center; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    background: var(--raised);
+    border-radius: 12px;
+  }
+  .segmented button {
+    height: 40px;
+    background: none;
+    border: 0;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+  .segmented button[aria-pressed="true"] {
+    background: var(--bg);
+    box-shadow: 0 0 0 1px var(--line);
+    font-weight: 500;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    main.enter { animation: none; }
+    .scrim, .drawer { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar" id="ui-topbar">
+  <button class="icon-btn" id="ui-menu-btn" aria-label="Songs" aria-controls="ui-drawer" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <p class="set-title" id="ui-set-title"></p>
+  <button class="icon-btn" id="ui-display-btn" aria-label="Text size and appearance" aria-controls="ui-panel" aria-expanded="false">
+    <span class="aa" aria-hidden="true"><small>A</small>A</span>
+  </button>
+</header>
+
+<div class="panel" id="ui-panel" hidden>
+  <div class="panel-row">
+    <p class="panel-label" id="ui-size-label">Text size</p>
+    <div class="stepper" role="group" aria-labelledby="ui-size-label">
+      <button class="smaller" id="ui-size-down" aria-label="Smaller text">A</button>
+      <output id="ui-size-value" aria-live="polite">100%</output>
+      <button class="larger" id="ui-size-up" aria-label="Larger text">A</button>
+    </div>
+  </div>
+  <div class="panel-row">
+    <p class="panel-label" id="ui-theme-label">Appearance</p>
+    <div class="segmented" role="group" aria-labelledby="ui-theme-label">
+      <button data-theme-choice="dark" aria-pressed="true">Dark</button>
+      <button data-theme-choice="light" aria-pressed="false">Light</button>
+    </div>
+  </div>
+</div>
+
+<main id="ui-main">
+  <p class="status" id="ui-status">Loading songs…</p>
+</main>
+
+<nav class="navbar" id="ui-navbar" aria-label="Song navigation">
+  <div class="navbar-inner">
+    <button class="nav-btn prev" id="ui-prev" disabled>
+      <span class="arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span>
+      <span class="label"><small>Previous</small><span id="ui-prev-name"></span></span>
+    </button>
+    <span class="nav-pos" id="ui-pos"></span>
+    <button class="nav-btn next" id="ui-next" disabled>
+      <span class="label"><small>Next</small><span id="ui-next-name"></span></span>
+      <span class="arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+    </button>
+  </div>
+</nav>
+
+<div class="scrim" id="ui-scrim"></div>
+<aside class="drawer" id="ui-drawer" aria-label="Songs">
+  <div class="drawer-head">
+    <h2>Songs</h2>
+    <button class="icon-btn" id="ui-menu-close" aria-label="Close song list">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <ol class="song-list" id="ui-song-list"></ol>
+  <div class="drawer-foot" id="ui-license"></div>
+</aside>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- Settings ----------
+  var SIZES = [16, 18, 20, 22, 25, 28, 32, 36]; // px
+  var DEFAULT_SIZE = 2;                          // 20px
+
+  // ---------- Helpers ----------
+  var root = document.documentElement;
+  function $(id) { return document.getElementById(id); }
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  var els = {
+    main: $('ui-main'), topbar: $('ui-topbar'), navbar: $('ui-navbar'),
+    setTitle: $('ui-set-title'),
+    menuBtn: $('ui-menu-btn'), menuClose: $('ui-menu-close'), drawer: $('ui-drawer'),
+    scrim: $('ui-scrim'), list: $('ui-song-list'), license: $('ui-license'),
+    displayBtn: $('ui-display-btn'), panel: $('ui-panel'),
+    sizeDown: $('ui-size-down'), sizeUp: $('ui-size-up'), sizeValue: $('ui-size-value'),
+    prev: $('ui-prev'), next: $('ui-next'), prevName: $('ui-prev-name'), nextName: $('ui-next-name'),
+    pos: $('ui-pos')
+  };
+
+  var songs = [];
+  var meta = { title: '', license: '' };
+  var current = -1;
+
+  // ---------- Parsing songs.txt ----------
+  var LABEL_WORDS = 'verse|chorus|pre[- ]?chorus|post[- ]?chorus|bridge|tag|intro|outro|interlude|ending|refrain|vamp|turnaround|instrumental|hook|coda|breakdown|channel|spontaneous';
+  var LABEL_RE = new RegExp('^\\[?\\s*(' + LABEL_WORDS + ')([\\s\\d().:xX×#ab-]{0,12})\\]?\\s*:?\\s*$', 'i');
+  var CHORUS_RE = /^(chorus|refrain|post[- ]?chorus)/i;
+  var CHORD_RE = /^\(?[A-G](#|b)?(maj|min|m|M|dim|aug|sus|add)?\d*((sus|add|maj|b|#)\d*)*(\/[A-G](#|b)?)?\)?$/;
+  var CHORD_FILLER_RE = /^[|\/.\-x×\d()]+$/;
+
+  function isChordLine(t) {
+    var tokens = t.split(/\s+/);
+    var chords = 0;
+    for (var i = 0; i < tokens.length; i++) {
+      if (CHORD_RE.test(tokens[i])) chords++;
+      else if (!CHORD_FILLER_RE.test(tokens[i])) return false;
+    }
+    return chords > 0;
+  }
+
+  function niceLabel(word, rest) {
+    var w = word.toLowerCase().replace(/\s+/, '-');
+    w = w.charAt(0).toUpperCase() + w.slice(1);
+    rest = rest.replace(/[:\s]+$/, '').trim();
+    return rest ? w + ' ' + rest : w;
+  }
+
+  function slugify(s) {
+    var slug = s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return slug || 'song';
+  }
+
+  function splitLines(text) {
+    return text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
+  }
+  function fileBase(path) {
+    return path.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+  }
+  function titleFromFile(path) {
+    return fileBase(path).replace(/[-_]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  // One song file: optional "# Title", optional "> credit" lines, then lyrics.
+  function parseSong(text, path) {
+    var song = { title: '', credits: [], file: path };
+    var raw = [];
+    function nothingYet() { return raw.every(function (l) { return l === ''; }); }
+
+    splitLines(text).forEach(function (line) {
+      var t = line.trim();
+      if (t.indexOf('//') === 0) return;
+      var heading = /^#(?!#)\s*(.+)$/.exec(t);
+      if (heading && !song.title && nothingYet()) { song.title = heading[1].trim(); return; }
+      if (t.charAt(0) === '>' && nothingYet()) { song.credits.push(t.replace(/^>\s*/, '')); return; }
+      raw.push(t);
+    });
+
+    if (!song.title) song.title = titleFromFile(path);
+    song.stanzas = buildStanzas(raw);
+    return song;
+  }
+
+  // setlist.yaml: reads title, license, and the songs list.
+  function cleanValue(v) {
+    v = v.trim();
+    var q = v.charAt(0);
+    if (q === '"' || q === "'") {
+      var end = v.indexOf(q, 1);
+      return end > 0 ? v.slice(1, end) : v.slice(1);
+    }
+    var m = /(^|\s)#/.exec(v); // YAML comment
+    if (m) v = v.slice(0, m.index);
+    return v.trim();
+  }
+  function parseSetlist(text) {
+    var set = { title: '', license: '', songs: [] };
+    var inSongs = false;
+    splitLines(text).forEach(function (line) {
+      var t = line.trim();
+      if (!t || t.charAt(0) === '#') return;
+      var item = /^-\s*(.*)$/.exec(t);
+      if (item) {
+        var v = cleanValue(item[1]);
+        if (inSongs && v) set.songs.push(v);
+        return;
+      }
+      var kv = /^([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(t);
+      if (kv && !/^\s/.test(line)) {
+        var key = kv[1].toLowerCase();
+        inSongs = key === 'songs';
+        if (key === 'title') set.title = cleanValue(kv[2]);
+        if (key === 'license') set.license = cleanValue(kv[2]);
+      }
+    });
+    return set;
+  }
+  function songPath(entry) {
+    var p = entry.replace(/^\.?\//, '');
+    if (p.indexOf('/') === -1) p = 'songs/' + p;
+    if (!/\.[a-z0-9]+$/i.test(p)) p += '.txt';
+    return p;
+  }
+
+  function buildStanzas(raw) {
+    var stanzas = [], cur = null, pendingLabel = null;
+    function close() { if (cur && cur.lines.length) stanzas.push(cur); cur = null; }
+
+    raw.forEach(function (t) {
+      if (t === '') { close(); return; }
+      var lab = LABEL_RE.exec(t);
+      if (lab) { close(); pendingLabel = niceLabel(lab[1], lab[2]); return; }
+      if (isChordLine(t)) return;
+      // Remove inline ChordPro chords like [G] or [Am7]
+      t = t.replace(/\[[A-G][^\]\s]{0,8}\]/g, '').replace(/\s{2,}/g, ' ').trim();
+      if (!t) return;
+      if (!cur) { cur = { label: pendingLabel, lines: [] }; pendingLabel = null; }
+      cur.lines.push(t);
+    });
+    close();
+    return stanzas;
+  }
+
+  // ---------- Rendering ----------
+  function renderSong(i) {
+    if (!songs.length) return;
+    i = Math.max(0, Math.min(songs.length - 1, i));
+    var s = songs[i];
+    current = i;
+
+    var html = '<h1 class="song-title" tabindex="-1">' + esc(s.title) + '</h1>';
+    s.stanzas.forEach(function (st) {
+      var chorus = st.label && CHORUS_RE.test(st.label);
+      html += '<section class="stanza' + (chorus ? ' is-chorus' : '') + '">';
+      if (st.label) html += '<h2 class="stanza-label">' + esc(st.label) + '</h2>';
+      html += '<p class="lines">' + st.lines.map(function (l) {
+        return '<span class="line">' + esc(l) + '</span>';
+      }).join('') + '</p></section>';
+    });
+    if (s.missing) html += '<p class="status">Lyrics for this song aren’t available yet.</p>';
+    else if (!s.stanzas.length) html += '<p class="status">No lyrics have been added for this song yet.</p>';
+    var credits = s.credits.slice();
+    if (meta.license) credits.push(meta.license);
+    if (credits.length) {
+      html += '<footer class="credits">' + credits.map(function (c) { return '<p>' + esc(c) + '</p>'; }).join('') + '</footer>';
+    }
+
+    els.main.innerHTML = html;
+    els.main.classList.remove('enter');
+    void els.main.offsetWidth;
+    els.main.classList.add('enter');
+    window.scrollTo(0, 0);
+
+    document.title = s.title + (meta.title ? ' – ' + meta.title : '');
+
+    var prev = songs[i - 1], next = songs[i + 1];
+    els.prev.disabled = !prev;
+    els.next.disabled = !next;
+    els.prevName.textContent = prev ? prev.title : '';
+    els.nextName.textContent = next ? next.title : '';
+    els.prev.setAttribute('aria-label', prev ? 'Previous song: ' + prev.title : 'No previous song');
+    els.next.setAttribute('aria-label', next ? 'Next song: ' + next.title : 'No next song');
+    els.pos.textContent = (i + 1) + ' of ' + songs.length;
+
+    Array.prototype.forEach.call(els.list.querySelectorAll('a'), function (a, idx) {
+      if (idx === i) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+  }
+
+  function renderList() {
+    els.list.innerHTML = songs.map(function (s, i) {
+      return '<li><a href="#' + esc(s.slug) + '"><span class="num">' + (i + 1) + '</span><span>' + esc(s.title) + '</span></a></li>';
+    }).join('');
+    els.license.textContent = meta.license || '';
+    els.setTitle.textContent = meta.title || 'Lyrics';
+  }
+
+  function showStatus(msg) {
+    els.main.innerHTML = '<p class="status">' + esc(msg) + '</p>';
+  }
+
+  // ---------- Navigation (each song has its own link, e.g. #amazing-grace) ----------
+  function indexFromHash() {
+    var h = '';
+    try { h = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
+    for (var i = 0; i < songs.length; i++) if (songs[i].slug === h) return i;
+    return -1;
+  }
+  function go(i) {
+    if (i < 0 || i >= songs.length) return;
+    if (location.hash.slice(1) === songs[i].slug) renderSong(i);
+    else location.hash = songs[i].slug; // hashchange renders it
+  }
+  window.addEventListener('hashchange', function () {
+    var i = indexFromHash();
+    if (i >= 0) { renderSong(i); closeMenu(); }
+  });
+  els.prev.addEventListener('click', function () { go(current - 1); });
+  els.next.addEventListener('click', function () { go(current + 1); });
+
+  // ---------- Song menu ----------
+  function setInert(on) {
+    [els.main, els.topbar, els.navbar].forEach(function (el) {
+      if (on) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+    });
+  }
+  function openMenu() {
+    closePanel();
+    document.body.classList.add('menu-open', 'locked');
+    els.menuBtn.setAttribute('aria-expanded', 'true');
+    setInert(true);
+    var target = els.list.querySelector('[aria-current="page"]') || els.menuClose;
+    setTimeout(function () { target.focus({ preventScroll: false }); }, 50);
+  }
+  function closeMenu() {
+    if (!document.body.classList.contains('menu-open')) return;
+    document.body.classList.remove('menu-open', 'locked');
+    els.menuBtn.setAttribute('aria-expanded', 'false');
+    setInert(false);
+  }
+  els.menuBtn.addEventListener('click', openMenu);
+  els.menuClose.addEventListener('click', function () { closeMenu(); els.menuBtn.focus(); });
+  els.scrim.addEventListener('click', closeMenu);
+  els.list.addEventListener('click', function (e) {
+    var a = e.target.closest('a');
+    if (!a) return;
+    // Tapping the song that's already open just closes the menu
+    if (a.getAttribute('href').slice(1) === location.hash.slice(1)) { e.preventDefault(); closeMenu(); }
+  });
+
+  // ---------- Text size & appearance ----------
+  var sizeIdx = parseInt(store.get('lyrics-size'), 10);
+  if (isNaN(sizeIdx)) sizeIdx = DEFAULT_SIZE;
+  function applySize(i) {
+    sizeIdx = Math.max(0, Math.min(SIZES.length - 1, i));
+    root.style.setProperty('--lyric-size', SIZES[sizeIdx] + 'px');
+    els.sizeValue.textContent = Math.round(SIZES[sizeIdx] / SIZES[DEFAULT_SIZE] * 100) + '%';
+    els.sizeDown.disabled = sizeIdx === 0;
+    els.sizeUp.disabled = sizeIdx === SIZES.length - 1;
+    store.set('lyrics-size', String(sizeIdx));
+  }
+  els.sizeDown.addEventListener('click', function () { applySize(sizeIdx - 1); });
+  els.sizeUp.addEventListener('click', function () { applySize(sizeIdx + 1); });
+
+  var themeButtons = document.querySelectorAll('[data-theme-choice]');
+  function applyTheme(t) {
+    root.dataset.theme = t;
+    store.set('lyrics-theme', t);
+    Array.prototype.forEach.call(themeButtons, function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.themeChoice === t));
+    });
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim());
+  }
+  Array.prototype.forEach.call(themeButtons, function (b) {
+    b.addEventListener('click', function () { applyTheme(b.dataset.themeChoice); });
+  });
+
+  function openPanel() {
+    els.panel.hidden = false;
+    els.displayBtn.setAttribute('aria-expanded', 'true');
+  }
+  function closePanel() {
+    if (els.panel.hidden) return;
+    els.panel.hidden = true;
+    els.displayBtn.setAttribute('aria-expanded', 'false');
+  }
+  els.displayBtn.addEventListener('click', function () {
+    if (els.panel.hidden) openPanel(); else closePanel();
+  });
+  document.addEventListener('pointerdown', function (e) {
+    if (!els.panel.hidden && !els.panel.contains(e.target) && !els.displayBtn.contains(e.target)) closePanel();
+  });
+
+  // ---------- Keyboard ----------
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeMenu(); closePanel(); return; }
+    if (document.body.classList.contains('menu-open')) return;
+    if (e.key === 'ArrowLeft') go(current - 1);
+    if (e.key === 'ArrowRight') go(current + 1);
+  });
+
+  // ---------- Keep the screen awake while reading ----------
+  var wakeLock = null;
+  function keepAwake() {
+    if (!('wakeLock' in navigator) || wakeLock || document.visibilityState !== 'visible') return;
+    navigator.wakeLock.request('screen').then(function (lock) {
+      wakeLock = lock;
+      lock.addEventListener('release', function () { wakeLock = null; });
+    }).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', keepAwake);
+  document.addEventListener('pointerdown', keepAwake, { passive: true });
+
+  // ---------- Start ----------
+  applySize(sizeIdx);
+  applyTheme(root.dataset.theme === 'light' ? 'light' : 'dark');
+  keepAwake();
+
+  function getText(url) {
+    return fetch(url, { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error(url + ' ' + r.status);
+      return r.text();
+    });
+  }
+
+  getText('setlist.yaml')
+    .then(function (text) {
+      var set = parseSetlist(text);
+      meta.title = set.title;
+      meta.license = set.license;
+      return Promise.all(set.songs.map(function (entry) {
+        var path = songPath(entry);
+        return getText(path)
+          .then(function (t) { return parseSong(t, path); })
+          .catch(function () {
+            if (window.console) console.warn('Missing song file: ' + path + ' (check the name in setlist.yaml)');
+            return { title: titleFromFile(path), credits: [], stanzas: [], file: path, missing: true };
+          });
+      }));
+    })
+    .then(function (list) {
+      songs = list;
+      var used = {};
+      songs.forEach(function (s) {
+        var base = slugify(fileBase(s.file)), slug = base, n = 2;
+        while (used[slug]) slug = base + '-' + (n++);
+        used[slug] = true;
+        s.slug = slug;
+      });
+      renderList();
+      if (!songs.length) {
+        showStatus('No songs yet. List song files under “songs:” in setlist.yaml.');
+        return;
+      }
+      var i = indexFromHash();
+      if (i < 0) {
+        i = 0;
+        try { history.replaceState(null, '', '#' + songs[0].slug); } catch (e) {}
+      }
+      renderSong(i);
+    })
+    .catch(function () {
+      if (location.protocol === 'file:') {
+        showStatus('Open this site from its web address. Browsers won’t load the song files from a folder on your computer.');
+      } else {
+        showStatus('Lyrics couldn’t load. Check your connection, then reload the page.');
+      }
+    });
+
+  // Save the site on the phone after the first visit, so it still works if Wi-Fi drops.
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>

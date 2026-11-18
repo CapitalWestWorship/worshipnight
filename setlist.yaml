@@ -1,0 +1,18 @@
+# Worship night set list
+# ------------------------------------------------------------
+# This file controls which songs show up and in what order.
+#  - Each line under "songs:" is the name of a file in the songs folder.
+#  - Reorder the lines to reorder the songs. Delete a line to hide a song.
+#  - The ".txt" at the end is optional.
+#  - Lines starting with # are notes and never show on the site.
+# ------------------------------------------------------------
+
+title: Worship Night
+
+# Optional: shown under every song. Keep the quotes if it contains a #.
+# license: "CCLI License #1234567"
+
+songs:
+  - amazing-grace.txt
+  - be-thou-my-vision.txt
+  - it-is-well.txt
