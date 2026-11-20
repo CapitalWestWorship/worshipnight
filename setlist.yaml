@@ -20,16 +20,16 @@ refresh: 30
 # license: "CCLI License #1234567"
 
 songs:
-  - AMAZING!.txt
-  - Christ Be Magnified.txt
-  - Another In The Fire.txt
-  - Firm Foundation.txt
-  - Gratitude.txt
-  - Praise.txt
-  - Holy Forever.txt
-  - Revelation Song.txt
   - We Praise You.txt
+  - Christ Be Magnified.txt
+  - Holy Forever.txt
+  - Another In The Fire.txt
+  - AMAZING!.txt
   - Abide.txt
+  - Revelation Song.txt
+  - Gratitude.txt
+  - Firm Foundation.txt
 
 additional:
   - Trust In God.txt
+  - Praise.txt
